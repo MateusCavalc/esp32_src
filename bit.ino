@@ -21,19 +21,19 @@ int potValue = 0;
 int count = 0;
 
 int perfil = 0;
-int waveForm = 1;
-int vibTimeMax = 300;
-float pctVibTime = 0.2;
 
-// setting PWM properties
-int freq = 2000;
+int innerWaveForm = 1;
+int outterWaveForm = 1;
+int innerFrequency = 1;
 int duty_pct = 50;
 int duty = ((float)duty_pct / 100) * 255;
 int uptime = 1000000; //micro
 int wait = 1000000; //micro
 
-const int stepEsp = 20; //tempo que o esp leva pra uma iteracao de escrita em micro
-const int BASE_DUTY_INIT_VALUE = 76; // 10% do dutyMax (255)
+// setting PWM properties
+int freq = 2000;
+
+const int BASE_DUTY_INIT_VALUE = 50; // 30% do dutyMax (255)
 
 int innerWavePoints[256];
 
@@ -85,7 +85,7 @@ void TrapezoidalWaveVectorGenerator(int dutyInicial) {
   }
 }
 
-void PulseTrainGenerator(int innerWave, int outterWave, int localDuty, float frequency, int upTime, int wait, int channel) {
+void PulseTrainGenerator(int innerWave, int outterWave, int localDuty, int frequency, int upTime, int wait, int channel) {
   int InnerPeriod = ((1.0/frequency)*(1000000));
 //  Serial.println(InnerPeriod);
 //  SquareWave(channel, localDuty, upTime, InnerPeriod);
@@ -107,18 +107,23 @@ void PulseTrainGenerator(int innerWave, int outterWave, int localDuty, float fre
 //      default:
 //        break;
 //    }
-    RestWave(channel, wait);
+    RestWave(channel, wait, InnerPeriod);
   }
 
-void RestWave(int channel, int _time) {
-  int64_t now = esp_timer_get_time();
+void RestWave(int channel, int _time, int period) {
+  int stepBase = round((float)period/BASE_DUTY_INIT_VALUE); // Tempo de cada step do duty base
+ 
   int64_t old = esp_timer_get_time();
 
-  while(now - old <= (int64_t)_time) {
+  while(esp_timer_get_time() - old <= (int64_t)_time) {
     ledcWrite(channel, 0);
     Serial.println("0, 255, 0, 0");
 //    Serial.println("0, 255, 0");
-    now = esp_timer_get_time();
+
+    int64_t oldStep = esp_timer_get_time();
+
+    // Espera o stepTime para decair o duty
+    while(esp_timer_get_time() - oldStep <= (int64_t)stepBase);
   }
 }
 
@@ -149,34 +154,46 @@ void TrapezoidalWave(int channel, int upTime, int period) {
 
   int waveCount = 0;
 
-  int stepBase = round((float)period/(BASE_DUTY_INIT_VALUE * 2)); // Tempo de cada step do duty base
+  int stepBase = round((float)period/BASE_DUTY_INIT_VALUE); // Tempo de cada step do duty base
 
   int64_t old = esp_timer_get_time();
+  float innerWaveElapsed = 0.0;
+  float innerZeroElapsed = 0.0;
 
   while(esp_timer_get_time() - old <= (int64_t)upTime) {
     
     int64_t oldInner = esp_timer_get_time();
     
-    for(int i = 0; (esp_timer_get_time() - oldInner <= (int64_t)period/2) && (innerWavePoints[i] > 0); i++) {
+    for(int i = 0; (esp_timer_get_time() - oldInner <= (int64_t)period/2) && (innerWavePoints[i] > 0); i++) {      
       ledcWrite(channel, innerWavePoints[i]);
       Serial.printf("0, 255, %d, %d\n", innerWavePoints[i], duty); 
 
       int64_t oldStep = esp_timer_get_time();
 
       // Espera o stepTime para decair o duty
-      while(esp_timer_get_time() - oldStep <= (int64_t)stepBase) {}
+      while(esp_timer_get_time() - oldStep <= (int64_t)stepBase);
     }
+    innerWaveElapsed = ((float)esp_timer_get_time() - oldInner)/1000000;
     while(esp_timer_get_time() - oldInner <= (int64_t)period) {
       ledcWrite(channel, 0);
       Serial.printf("0, 255, 0, %d\n", duty);
+      int64_t oldStep = esp_timer_get_time();
+
+      // Espera o stepTime para decair o duty
+      while(esp_timer_get_time() - oldStep <= (int64_t)stepBase);
     }
+
+    innerZeroElapsed = ((float)esp_timer_get_time() - oldInner)/1000000;
 
     waveCount++;
     
   }
 
-  Serial.println(waveCount);
-  delay(5000);
+//  Serial.println(waveCount);
+//  Serial.printf("Elapsed innerWave: %f\n", innerWaveElapsed);
+//  Serial.printf("Elapsed innerZeros: %f\n", innerZeroElapsed);
+//  Serial.printf("Elapsed out: %f\n", ((float)esp_timer_get_time() - old)/1000000);
+//  delay(2000);
   
 }
 
@@ -217,30 +234,54 @@ void TriangleWave(int channel, int dutyInicial, int upTime, int frequency) {
 
 
 void SineWave(int channel, int dutyInicial, int upTime, int frequency) {
-  int localDuty = 0;
-  int actDuty = 0;
-  for(; localDuty <= duty; localDuty++) {
-    for(int i = 0; i < 100; i++) {
-      actDuty = (int)(localDuty * sinePoints[i]);
-      ledcWrite(channel, actDuty);
-      Serial.println(actDuty);
-    }
-    for(float i = 0; i <= pctVibTime*vibTimeMax; i++) {
-      Serial.println(0);
-      delay(2);
-    }
-  }
-  for(; localDuty >= 0; localDuty--) {
-    for(int i = 0; i < 100; i++) {
-      actDuty = (int)(localDuty * sinePoints[i]);
-      ledcWrite(channel, actDuty);
-      Serial.println(actDuty);
-    }
-    for(float i = 0; i <= pctVibTime*vibTimeMax; i++) {
-      Serial.println(0);
-      delay(2);
-    }
-  }
+//  int localDuty = 0;
+//  int actDuty = 0;
+//  for(; localDuty <= duty; localDuty++) {
+//    for(int i = 0; i < 100; i++) {
+//      actDuty = (int)(localDuty * sinePoints[i]);
+//      ledcWrite(channel, actDuty);
+//      Serial.println(actDuty);
+//    }
+//    for(float i = 0; i <= pctVibTime*vibTimeMax; i++) {
+//      Serial.println(0);
+//      delay(2);
+//    }
+//  }
+//  for(; localDuty >= 0; localDuty--) {
+//    for(int i = 0; i < 100; i++) {
+//      actDuty = (int)(localDuty * sinePoints[i]);
+//      ledcWrite(channel, actDuty);
+//      Serial.println(actDuty);
+//    }
+//    for(float i = 0; i <= pctVibTime*vibTimeMax; i++) {
+//      Serial.println(0);
+//      delay(2);
+//    }
+//  }
+}
+
+void ParseSerialParams(String serialData) {
+  // 0:0:30:10:1000000:1000000
+  // Extrai o innerWaveForm
+  innerWaveForm = serialData.substring(0, serialData.indexOf(":")).toInt();
+  serialData.remove(0, serialData.indexOf(":") + 1);
+  // Extrai o outterWaveForm
+  outterWaveForm = serialData.substring(0, serialData.indexOf(":")).toInt();
+  serialData.remove(0, serialData.indexOf(":") + 1);
+  // Extrai o localDuty
+  duty_pct = serialData.substring(0, serialData.indexOf(":")).toInt();
+  duty = ((float)duty_pct / 100) * 255;
+  serialData.remove(0, serialData.indexOf(":") + 1);
+  // Extrai o frequency
+  innerFrequency = serialData.substring(0, serialData.indexOf(":")).toInt();
+  serialData.remove(0, serialData.indexOf(":") + 1);
+  // Extrai o upTime
+  uptime = serialData.substring(0, serialData.indexOf(":")).toInt();
+  serialData.remove(0, serialData.indexOf(":") + 1);
+  // Extrai o wait
+  wait = serialData.substring(0, serialData.indexOf(":")).toInt();
+
+  TrapezoidalWaveVectorGenerator(duty);
 }
 
 void loop() {  
@@ -248,21 +289,12 @@ void loop() {
   // waveForm = 1 (Dente-de-serra)
   // duty_pct = 2% (0.02 * 255 -> aprox 5)
 
-  if(Serial.available()) {
+  if(Serial.available()) { // innerWave, outterWave, localDuty, frequency, upTime, wait
     String serialData = Serial.readString();
-    int sep = serialData.indexOf(":");
-    if(sep != -1) {
-      waveForm = serialData.substring(0, serialData.indexOf(":")).toInt();
-      duty_pct = serialData.substring(serialData.indexOf(":")+1, serialData.indexOf(";")).toInt();
-      perfil = serialData.substring(serialData.indexOf(";")+1).toInt();
-    }
-    else {
-      duty_pct = serialData.toInt();
-    }
-    duty = ((float)duty_pct / 100) * 255;
+    ParseSerialParams(serialData);
   }
   // int innerWave, int outterWave, int localDuty, float frequency, int upTime, int wait, int channel
-  PulseTrainGenerator(0, 0, duty, 20.0, uptime, wait, ledChannel1);
+  PulseTrainGenerator(innerWaveForm, outterWaveForm, duty, innerFrequency, uptime, wait, ledChannel1);
   
 //   if(waveForm == 0) { // Onda Quadrada
 //     SquareWave(ledChannel1);
