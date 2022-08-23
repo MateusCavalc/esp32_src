@@ -2,19 +2,19 @@
 //#include "pitches.h"
 
 // Definição de notas musicais
-#define C_0 20
-#define D_0 25
-#define E_0 30
-#define F_0 35
-#define G_0 40
-#define A_0 45
+#define C_0 10
+#define D_0 15
+#define E_0 20
+#define F_0 25
+#define G_0 30
+#define A_0 40
 #define B_0 50
 #define C_1 60
 
 #define BASE_COMPASS 300000
 
-const int freqList[] = {G_0, E_0, G_0, E_0, G_0, E_0, D_0, C_0};
-const int noteTimes[] = {1, 2, 2, 2, 2, 2, 2, 2};
+const int freqList[] = {C_0, C_0, G_0, E_0, A_0, A_0, C_0, G_0};
+const int noteTimes[] = {2, 2, 2, 2, 2, 2, 2, 2};
 
 const float sinePoints[] = {0.000000,0.188255,0.611260,0.950484,0.950484,0.611260,0.188255,0.000000};
 
@@ -30,12 +30,12 @@ int count = 0;
 int perfil = 0;
 
 int innerWaveForm = 1;
-int outterWaveForm = 1;
+int outterWaveForm = 0;
 int innerFrequency = 1;
 int duty_pct = 30;
 int duty = ((float)duty_pct / 100) * 255;
 int uptime = 1000000; //micro
-int wait = 1000000; //micro
+int wait = 100000; //micro
 
 // setting PWM properties
 int freq = 2000;
@@ -59,7 +59,7 @@ void setup() {
   memset(innerWavePoints, 0, sizeof(innerWavePoints));
 
 //  SawToothWaveVectorGenerator(duty);
-  TrapezoidalWaveVectorGenerator(duty);
+  TrapezoidalWaveVectorGenerator(true, duty);
 
   // configure LED PWM functionalitites
   ledcSetup(ledChannel1, freq, resolution);
@@ -81,42 +81,50 @@ void SawToothWaveVectorGenerator(int dutyInicial) {
   }
 }
 
-void TrapezoidalWaveVectorGenerator(int dutyInicial) {
+void TrapezoidalWaveVectorGenerator(bool inv, int dutyInicial) {
 
   int finalDutyPct = 20;
   int finalDuty = ((float)finalDutyPct / 100) * dutyInicial;
   
   float dutyScaleStep = (float)dutyInicial/BASE_DUTY_INIT_VALUE; // Escala entre os valores de duty e dutyBase (ajuste de slope)
   int i = 0;
-  
-  for(float dutyLocal = (float)dutyInicial; dutyLocal >= finalDuty; dutyLocal -= dutyScaleStep, i++) {
-    innerWavePoints[i] = ceil(dutyLocal);
+
+  if(inv) {
+    for(float dutyLocal = (float)finalDuty; dutyLocal <= dutyInicial; dutyLocal += dutyScaleStep, i++) {
+      innerWavePoints[i] = ceil(dutyLocal);
+    }
   }
+  else {
+    for(float dutyLocal = (float)dutyInicial; dutyLocal >= finalDuty; dutyLocal -= dutyScaleStep, i++) {
+      innerWavePoints[i] = ceil(dutyLocal);
+    }
+  }
+  
 }
 
 void PulseTrainGenerator(int innerWave, int outterWave, int localDuty, int frequency, int upTime, int wait, int channel) {
   int InnerPeriod = ((1.0/frequency)*(1000000));
-//  Serial.println(InnerPeriod);
 //  SquareWave(channel, localDuty, upTime, InnerPeriod);
-//  TrapezoidalWave(channel, upTime, frequency, InnerPeriod);
+  
 //  SawToothWave(channel, upTime, InnerPeriod);
-  SineWave(channel, upTime, InnerPeriod);
-//    switch(innerWave) {
-//      case 0:
-//        SquareWave(channel, localDuty, upTime, InnerPeriod);
-//        break;
-//      case 1:
-//        SawToothWave(channel, localDuty, upTime, InnerPeriod);
-//        break;
-//      case 2:
-//        TriangleWave(channel, localDuty, upTime, InnerPeriod);
-//        break;
-//      case 3:
-//        SineWave(channel, localDuty, upTime, InnerPeriod);
-//        break;
-//      default:
-//        break;
-//    }
+//  SineWave(channel, upTime, InnerPeriod);
+    switch(innerWave) {
+      case 0:
+      case 1:
+        TrapezoidalWave(channel, upTime, frequency, InnerPeriod);
+        break;
+      case 2:
+        SawToothWave(channel, upTime, InnerPeriod);
+        break;
+      case 3:
+        SquareWave(channel, localDuty, upTime, InnerPeriod);
+        break;
+      case 4:
+        SineWave(channel, upTime, InnerPeriod);
+        break;
+      default:
+        break;
+    }
     RestWave(channel, wait, InnerPeriod);
   }
 
@@ -176,7 +184,7 @@ void TrapezoidalWave(int channel, int upTime, int frequency, int period) {
   while(esp_timer_get_time() - old <= (int64_t)upTime) {
     
     int64_t oldInner = esp_timer_get_time();
-    
+
     for(int i = 0; (esp_timer_get_time() - oldInner <= (int64_t)period/2) && (innerWavePoints[i] > 0); i++) {      
       ledcWrite(channel, innerWavePoints[i]);
       Serial.printf("0, 255, %d, %d\n", innerWavePoints[i], duty); 
@@ -186,6 +194,7 @@ void TrapezoidalWave(int channel, int upTime, int frequency, int period) {
       // Espera o stepTime para decair o duty
       while(esp_timer_get_time() - oldStep <= (int64_t)stepBase);
     }
+    
     innerWaveElapsed = ((float)esp_timer_get_time() - oldInner)/1000000;
     while(esp_timer_get_time() - oldInner <= (int64_t)period) {
       ledcWrite(channel, 0);
@@ -270,8 +279,8 @@ void SineWave(int channel, int upTime, int period) {
     waveCount++;
   }
 
-  Serial.println(waveCount);
-  delay(2000);
+//  Serial.println(waveCount);
+//  delay(2000);
 }
 
 void ParseSerialParams(String serialData) {
@@ -295,7 +304,16 @@ void ParseSerialParams(String serialData) {
   // Extrai o wait
   wait = serialData.substring(0, serialData.indexOf(":")).toInt();
 
-  TrapezoidalWaveVectorGenerator(duty);
+  switch(innerWaveForm) {
+      case 0:
+        TrapezoidalWaveVectorGenerator(false, duty);
+        break;
+      case 1:
+        TrapezoidalWaveVectorGenerator(true, duty);
+        break;
+      default:
+        break;
+    }
 }
 
 void loop() {  
@@ -308,13 +326,13 @@ void loop() {
     ParseSerialParams(serialData);
   }
 
-    PulseTrainGenerator(innerWaveForm, outterWaveForm, duty, innerFrequency, uptime, wait, ledChannel1);
+//    PulseTrainGenerator(innerWaveForm, outterWaveForm, duty, innerFrequency, uptime, wait, ledChannel1);
 
-//  for (int i = 0; i < (sizeof(freqList) / sizeof(freqList[0])); i++) {
-//    PulseTrainGenerator(innerWaveForm, outterWaveForm, duty, (int)((float)freqList[i]/1.5), noteTimes[i] * BASE_COMPASS, wait, ledChannel1);
-//  }
-//
-//  delay(1000);
+  for (int i = 0; i < (sizeof(freqList) / sizeof(freqList[0])); i++) {
+    PulseTrainGenerator(innerWaveForm, outterWaveForm, duty, (int)((float)freqList[i]/2), noteTimes[i] * BASE_COMPASS, wait, ledChannel1);
+  }
+
+  delay(1000);
   
 //   if(waveForm == 0) { // Onda Quadrada
 //     SquareWave(ledChannel1);
