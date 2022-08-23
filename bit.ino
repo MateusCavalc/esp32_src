@@ -1,21 +1,28 @@
 #include <soc/rtc.h>
+//#include "pitches.h"
 
-const float sinePoints[] = {0.000063,0.000566,0.003081,0.007596,0.014094,0.022549,0.032926,0.045184,0.059273,0.075137,
-                            0.092712,0.111927,0.132704,0.154960,0.178606,0.203546,0.229680,0.256902,0.285103,0.314169,
-                            0.343983,0.374426,0.405374,0.436704,0.468288,0.500000,0.531712,0.563296,0.594626,0.625574,
-                            0.656017,0.685831,0.714897,0.743098,0.770320,0.796454,0.821394,0.845040,0.867296,0.888073,
-                            0.907288,0.924863,0.940727,0.954816,0.967074,0.977451,0.985906,0.992404,0.996919,0.999434,
-                            0.999937,0.998427,0.994911,0.989401,0.981921,0.972500,0.961177,0.947997,0.933013,0.916285,
-                            0.897881,0.877875,0.856347,0.833385,0.809079,0.783530,0.756839,0.729113,0.700465,0.671010,
-                            0.640866,0.610155,0.579001,0.547528,0.515864,0.484136,0.452472,0.420999,0.389845,0.359134,
-                            0.328990,0.299535,0.270887,0.243161,0.216470,0.190921,0.166615,0.143653,0.122125,0.102119,
-                            0.083715,0.066987,0.052003,0.038823,0.027500,0.018079,0.010599,0.005089,0.001573,0.000063};
+// Definição de notas musicais
+#define C_0 20
+#define D_0 25
+#define E_0 30
+#define F_0 35
+#define G_0 40
+#define A_0 45
+#define B_0 50
+#define C_1 60
+
+#define BASE_COMPASS 300000
+
+const int freqList[] = {G_0, E_0, G_0, E_0, G_0, E_0, D_0, C_0};
+const int noteTimes[] = {1, 2, 2, 2, 2, 2, 2, 2};
+
+const float sinePoints[] = {0.000000,0.188255,0.611260,0.950484,0.950484,0.611260,0.188255,0.000000};
 
 
 // the number of the LED pin
-const int pwmPin1 = 16;  // 16 corresponds to GPIO16
-const int pwmPin2 = 17;  // 17 corresponds to GPIO17
-const int potPin = 34;
+const int pwmPin1 = 16;    // 16 corresponds to GPIO16
+const int pwmPin2 = 17;    // 17 corresponds to GPIO17
+const int TONE_OUTPUT_PIN = 18;  // 18 corresponds to GPIO18
 
 int potValue = 0;
 int count = 0;
@@ -25,7 +32,7 @@ int perfil = 0;
 int innerWaveForm = 1;
 int outterWaveForm = 1;
 int innerFrequency = 1;
-int duty_pct = 50;
+int duty_pct = 30;
 int duty = ((float)duty_pct / 100) * 255;
 int uptime = 1000000; //micro
 int wait = 1000000; //micro
@@ -37,8 +44,9 @@ const int BASE_DUTY_INIT_VALUE = 50; // 30% do dutyMax (255)
 
 int innerWavePoints[256];
 
+const int TONE_PWM_CHANNEL = 1;
 const int ledChannel1 = 0;
-const int ledChannel2 = 1;
+const int ledChannel2 = 2;
 const int resolution = 8;
 
 void setup() {
@@ -60,6 +68,7 @@ void setup() {
   // attach the channel to the GPIO to be controlled
   ledcAttachPin(pwmPin1, ledChannel1);
   ledcAttachPin(pwmPin2, ledChannel2);
+  ledcAttachPin(TONE_OUTPUT_PIN, TONE_PWM_CHANNEL);
 }
 
 void SawToothWaveVectorGenerator(int dutyInicial) {
@@ -75,7 +84,7 @@ void SawToothWaveVectorGenerator(int dutyInicial) {
 void TrapezoidalWaveVectorGenerator(int dutyInicial) {
 
   int finalDutyPct = 20;
-  int finalDuty = ((float)duty_pct / 100) * duty;
+  int finalDuty = ((float)finalDutyPct / 100) * dutyInicial;
   
   float dutyScaleStep = (float)dutyInicial/BASE_DUTY_INIT_VALUE; // Escala entre os valores de duty e dutyBase (ajuste de slope)
   int i = 0;
@@ -89,8 +98,9 @@ void PulseTrainGenerator(int innerWave, int outterWave, int localDuty, int frequ
   int InnerPeriod = ((1.0/frequency)*(1000000));
 //  Serial.println(InnerPeriod);
 //  SquareWave(channel, localDuty, upTime, InnerPeriod);
-  TrapezoidalWave(channel, upTime, InnerPeriod);
+//  TrapezoidalWave(channel, upTime, frequency, InnerPeriod);
 //  SawToothWave(channel, upTime, InnerPeriod);
+  SineWave(channel, upTime, InnerPeriod);
 //    switch(innerWave) {
 //      case 0:
 //        SquareWave(channel, localDuty, upTime, InnerPeriod);
@@ -111,7 +121,8 @@ void PulseTrainGenerator(int innerWave, int outterWave, int localDuty, int frequ
   }
 
 void RestWave(int channel, int _time, int period) {
-  int stepBase = round((float)period/BASE_DUTY_INIT_VALUE); // Tempo de cada step do duty base
+  int stepBase = round((float)period/8); // Tempo de cada step do duty base
+//  int stepBase = round((float)period/BASE_DUTY_INIT_VALUE); // Tempo de cada step do duty base
  
   int64_t old = esp_timer_get_time();
 
@@ -149,7 +160,7 @@ void SquareWave(int channel, int localDuty, int upTime, int frequency) {
   }
 }
 
-void TrapezoidalWave(int channel, int upTime, int period) {
+void TrapezoidalWave(int channel, int upTime, int frequency, int period) {
   //  Serial.println("TrapezoidalWave");
 
   int waveCount = 0;
@@ -159,6 +170,8 @@ void TrapezoidalWave(int channel, int upTime, int period) {
   int64_t old = esp_timer_get_time();
   float innerWaveElapsed = 0.0;
   float innerZeroElapsed = 0.0;
+
+  ledcWriteTone(TONE_PWM_CHANNEL, 17*frequency); // Buzzer ON !
 
   while(esp_timer_get_time() - old <= (int64_t)upTime) {
     
@@ -188,6 +201,8 @@ void TrapezoidalWave(int channel, int upTime, int period) {
     waveCount++;
     
   }
+
+  ledcWriteTone(TONE_PWM_CHANNEL, 0); // Buzzer OFF !
 
 //  Serial.println(waveCount);
 //  Serial.printf("Elapsed innerWave: %f\n", innerWaveElapsed);
@@ -233,31 +248,30 @@ void TriangleWave(int channel, int dutyInicial, int upTime, int frequency) {
 }
 
 
-void SineWave(int channel, int dutyInicial, int upTime, int frequency) {
-//  int localDuty = 0;
-//  int actDuty = 0;
-//  for(; localDuty <= duty; localDuty++) {
-//    for(int i = 0; i < 100; i++) {
-//      actDuty = (int)(localDuty * sinePoints[i]);
-//      ledcWrite(channel, actDuty);
-//      Serial.println(actDuty);
-//    }
-//    for(float i = 0; i <= pctVibTime*vibTimeMax; i++) {
-//      Serial.println(0);
-//      delay(2);
-//    }
-//  }
-//  for(; localDuty >= 0; localDuty--) {
-//    for(int i = 0; i < 100; i++) {
-//      actDuty = (int)(localDuty * sinePoints[i]);
-//      ledcWrite(channel, actDuty);
-//      Serial.println(actDuty);
-//    }
-//    for(float i = 0; i <= pctVibTime*vibTimeMax; i++) {
-//      Serial.println(0);
-//      delay(2);
-//    }
-//  }
+void SineWave(int channel, int upTime, int period) {
+
+  int stepBase = round((float)period/8); // Tempo de cada step do duty base
+  int actDuty = 0;
+
+  int64_t old = esp_timer_get_time();
+  int waveCount = 0;
+
+  while(esp_timer_get_time() - old <= (int64_t)upTime) {
+    for(int i = 0; (esp_timer_get_time() - old <= (int64_t)upTime) && (i < 8); i++) {
+      actDuty = (int)(duty * sinePoints[i]);
+      ledcWrite(channel, actDuty);
+      Serial.printf("0, 255, %d, %d\n", actDuty, duty); 
+  
+      int64_t oldStep = esp_timer_get_time();
+  
+      // Espera o stepTime para decair o duty
+      while(esp_timer_get_time() - oldStep <= (int64_t)stepBase);
+    }
+    waveCount++;
+  }
+
+  Serial.println(waveCount);
+  delay(2000);
 }
 
 void ParseSerialParams(String serialData) {
@@ -293,8 +307,14 @@ void loop() {
     String serialData = Serial.readString();
     ParseSerialParams(serialData);
   }
-  // int innerWave, int outterWave, int localDuty, float frequency, int upTime, int wait, int channel
-  PulseTrainGenerator(innerWaveForm, outterWaveForm, duty, innerFrequency, uptime, wait, ledChannel1);
+
+    PulseTrainGenerator(innerWaveForm, outterWaveForm, duty, innerFrequency, uptime, wait, ledChannel1);
+
+//  for (int i = 0; i < (sizeof(freqList) / sizeof(freqList[0])); i++) {
+//    PulseTrainGenerator(innerWaveForm, outterWaveForm, duty, (int)((float)freqList[i]/1.5), noteTimes[i] * BASE_COMPASS, wait, ledChannel1);
+//  }
+//
+//  delay(1000);
   
 //   if(waveForm == 0) { // Onda Quadrada
 //     SquareWave(ledChannel1);
