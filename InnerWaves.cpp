@@ -1,9 +1,9 @@
-#include "Arduino.h"
 #include "InnerWaves.h"
+#include "Arduino.h"
 
 void RestWave(int channel, int _time, int period) {
   int stepBase = round((float)period/8); // Tempo de cada step do duty base
-//  int stepBase = round((float)period/BASE_DUTY_INIT_VALUE); // Tempo de cada step do duty base
+//  int stepBase = round((float)period/configs.BASE_DUTY_INIT_VALUE); // Tempo de cada step do duty base
  
   int64_t old = esp_timer_get_time();
 
@@ -21,24 +21,23 @@ void RestWave(int channel, int _time, int period) {
 
 void TrapezoidalWave(int channel, int upTime, int frequency, int period) {
   //  Serial.println("TrapezoidalWave");
-
-  int waveCount = 0;
-
-  int stepBase = round((float)period/BASE_DUTY_INIT_VALUE); // Tempo de cada step do duty base
+  
+  int duty = ((float)params.duty_pct / 100) * 255;
+  int stepBase = round((float)period/configs.BASE_DUTY_INIT_VALUE); // Tempo de cada step do duty base
 
   int64_t old = esp_timer_get_time();
   float innerWaveElapsed = 0.0;
   float innerZeroElapsed = 0.0;
 
-  ledcWriteTone(TONE_PWM_CHANNEL, 17*frequency); // Buzzer ON !
+  ledcWriteTone(channels.TONE_CHANNEL, 17*frequency); // Buzzer ON !
 
   while(esp_timer_get_time() - old <= (int64_t)upTime) {
     
     int64_t oldInner = esp_timer_get_time();
 
-    for(int i = 0; (esp_timer_get_time() - oldInner <= (int64_t)period/2) && (innerWavePoints[i] > 0); i++) {      
-      ledcWrite(channel, innerWavePoints[i]);
-      Serial.printf("0, 255, %d, %d\n", innerWavePoints[i], duty); 
+    for(int i = 0; (esp_timer_get_time() - oldInner <= (int64_t)period/2) && (bufferPoints[i] > 0); i++) {      
+      ledcWrite(channel, bufferPoints[i]);
+      Serial.printf("0, 255, %d, %d\n", bufferPoints[i], duty); 
 
       int64_t oldStep = esp_timer_get_time();
 
@@ -57,14 +56,11 @@ void TrapezoidalWave(int channel, int upTime, int frequency, int period) {
     }
 
     innerZeroElapsed = ((float)esp_timer_get_time() - oldInner)/1000000;
-
-    waveCount++;
     
   }
 
-  ledcWriteTone(TONE_PWM_CHANNEL, 0); // Buzzer OFF !
+  ledcWriteTone(channels.TONE_CHANNEL, 0); // Buzzer OFF !
 
-//  Serial.println(waveCount);
 //  Serial.printf("Elapsed innerWave: %f\n", innerWaveElapsed);
 //  Serial.printf("Elapsed innerZeros: %f\n", innerZeroElapsed);
 //  Serial.printf("Elapsed out: %f\n", ((float)esp_timer_get_time() - old)/1000000);
@@ -95,16 +91,17 @@ void SquareWave(int channel, int localDuty, int upTime, int frequency) {
 }
 
 void SawToothWave(int channel, int upTime, int period) {
-
-  int stepBase = round((float)period/BASE_DUTY_INIT_VALUE); // Tempo de cada step do duty base
+  
+  int duty = ((float)params.duty_pct / 100) * 255;
+  int stepBase = round((float)period/configs.BASE_DUTY_INIT_VALUE); // Tempo de cada step do duty base
 
   int64_t old = esp_timer_get_time();
   
   while(esp_timer_get_time() - old <= (int64_t)upTime) {
-    for(int i = 0; (esp_timer_get_time() - old <= (int64_t)upTime) && (innerWavePoints[i] > 0); i++) {
+    for(int i = 0; (esp_timer_get_time() - old <= (int64_t)upTime) && (bufferPoints[i] > 0); i++) {
 
-      ledcWrite(channel, innerWavePoints[i]);
-      Serial.printf("0, 80, %d, %d\n", innerWavePoints[i], duty);
+      ledcWrite(channel, bufferPoints[i]);
+      Serial.printf("0, 80, %d, %d\n", bufferPoints[i], duty);
 
       int64_t oldInner = esp_timer_get_time();
 
@@ -117,7 +114,10 @@ void SawToothWave(int channel, int upTime, int period) {
 }
 
 void TriangleWave(int channel, int dutyInicial, int upTime, int frequency) {
+
+  int duty = ((float)params.duty_pct / 100) * 255;
   int dutyLocal = 0;
+  
   for(; dutyLocal <= duty; dutyLocal++) {
     ledcWrite(channel, dutyLocal);
     Serial.println(dutyLocal);
@@ -131,11 +131,11 @@ void TriangleWave(int channel, int dutyInicial, int upTime, int frequency) {
 
 void SineWave(int channel, int upTime, int period) {
 
+  int duty = ((float)params.duty_pct / 100) * 255;
   int stepBase = round((float)period/8); // Tempo de cada step do duty base
   int actDuty = 0;
 
   int64_t old = esp_timer_get_time();
-  int waveCount = 0;
 
   while(esp_timer_get_time() - old <= (int64_t)upTime) {
     for(int i = 0; (esp_timer_get_time() - old <= (int64_t)upTime) && (i < 8); i++) {
@@ -148,9 +148,6 @@ void SineWave(int channel, int upTime, int period) {
       // Espera o stepTime para decair o duty
       while(esp_timer_get_time() - oldStep <= (int64_t)stepBase);
     }
-    waveCount++;
   }
 
-//  Serial.println(waveCount);
-//  delay(2000);
 }

@@ -1,5 +1,5 @@
 #include <soc/rtc.h>
-#include "InnerWaves.h"
+#include "Generators.h"
 
 // Definição de notas musicais
 #define C_0 10
@@ -16,39 +16,6 @@
 const int freqList[] = {C_0, C_0, G_0, E_0, A_0, A_0, C_0, G_0};
 const int noteTimes[] = {2, 2, 2, 2, 2, 2, 2, 2};
 
-const float sinePoints[] = {0.000000,0.188255,0.611260,0.950484,0.950484,0.611260,0.188255,0.000000};
-
-
-// the number of the LED pin
-const int pwmPin1 = 16;    // 16 corresponds to GPIO16
-const int pwmPin2 = 17;    // 17 corresponds to GPIO17
-const int TONE_OUTPUT_PIN = 18;  // 18 corresponds to GPIO18
-
-int potValue = 0;
-int count = 0;
-
-int perfil = 0;
-
-int innerWaveForm = 1;
-int outterWaveForm = 0;
-int innerFrequency = 1;
-int duty_pct = 30;
-int duty = ((float)duty_pct / 100) * 255;
-int uptime = 1000000; //micro
-int wait = 100000; //micro
-
-// setting PWM properties
-int freq = 2000;
-
-const int BASE_DUTY_INIT_VALUE = 50; // 30% do dutyMax (255)
-
-int innerWavePoints[256];
-
-const int TONE_PWM_CHANNEL = 1;
-const int ledChannel1 = 0;
-const int ledChannel2 = 2;
-const int resolution = 8;
-
 void setup() {
 
   // Serial port for debugging purposes
@@ -56,19 +23,18 @@ void setup() {
   Serial.println("MinScale, MaxScale, Inner, Outter");
 //  Serial.println("MinScale, MaxScale, Train");
 
-  memset(innerWavePoints, 0, sizeof(innerWavePoints));
+  memset(bufferPoints, 0, sizeof(bufferPoints));
 
-//  SawToothWaveVectorGenerator(duty);
-  TrapezoidalWaveVectorGenerator(true, duty);
+  GenerateWaveVector();
 
   // configure LED PWM functionalitites
-  ledcSetup(ledChannel1, freq, resolution);
-  ledcSetup(ledChannel2, freq, resolution);
+  ledcSetup(channels.PADS_CHANNEL_1, configs.PWM_FREQ, configs.PWM_RESOLUTION);
+  ledcSetup(channels.PADS_CHANNEL_2, configs.PWM_FREQ, configs.PWM_RESOLUTION);
 
   // attach the channel to the GPIO to be controlled
-  ledcAttachPin(pwmPin1, ledChannel1);
-  ledcAttachPin(pwmPin2, ledChannel2);
-  ledcAttachPin(TONE_OUTPUT_PIN, TONE_PWM_CHANNEL);
+  ledcAttachPin(pins.PWM_PIN_1, channels.PADS_CHANNEL_1);
+  ledcAttachPin(pins.PWM_PIN_2, channels.PADS_CHANNEL_2);
+  ledcAttachPin(pins.TONE_PIN, channels.TONE_CHANNEL);
 }
 
 void loop() {  
@@ -81,10 +47,12 @@ void loop() {
     ParseSerialParams(serialData);
   }
 
-//    PulseTrainGenerator(innerWaveForm, outterWaveForm, duty, innerFrequency, uptime, wait, ledChannel1);
+  int duty = ((float)params.duty_pct / 100) * 255;
+
+//    PulseTrainGenerator(params.innerWaveForm, params.outterWaveForm, duty, params.innerFrequency, params.uptime, params.wait, channels.PADS_CHANNEL_1);
 
   for (int i = 0; i < (sizeof(freqList) / sizeof(freqList[0])); i++) {
-    PulseTrainGenerator(innerWaveForm, outterWaveForm, duty, (int)((float)freqList[i]/2), noteTimes[i] * BASE_COMPASS, wait, ledChannel1);
+    GeneratePulseTrain(params.innerWaveForm, params.outterWaveForm, duty, (int)((float)freqList[i]/2), noteTimes[i] * BASE_COMPASS, params.wait, channels.PADS_CHANNEL_1);
   }
 
   delay(1000);
@@ -109,32 +77,22 @@ void loop() {
 void ParseSerialParams(String serialData) {
   // 0:0:30:10:1000000:1000000
   // Extrai o innerWaveForm
-  innerWaveForm = serialData.substring(0, serialData.indexOf(":")).toInt();
+  params.innerWaveForm = serialData.substring(0, serialData.indexOf(":")).toInt();
   serialData.remove(0, serialData.indexOf(":") + 1);
   // Extrai o outterWaveForm
-  outterWaveForm = serialData.substring(0, serialData.indexOf(":")).toInt();
+  params.outterWaveForm = serialData.substring(0, serialData.indexOf(":")).toInt();
   serialData.remove(0, serialData.indexOf(":") + 1);
   // Extrai o localDuty
-  duty_pct = serialData.substring(0, serialData.indexOf(":")).toInt();
-  duty = ((float)duty_pct / 100) * 255;
+  params.duty_pct = serialData.substring(0, serialData.indexOf(":")).toInt();
   serialData.remove(0, serialData.indexOf(":") + 1);
   // Extrai o frequency
-  innerFrequency = serialData.substring(0, serialData.indexOf(":")).toInt();
+  params.innerFrequency = serialData.substring(0, serialData.indexOf(":")).toInt();
   serialData.remove(0, serialData.indexOf(":") + 1);
   // Extrai o upTime
-  uptime = serialData.substring(0, serialData.indexOf(":")).toInt();
+  params.uptime = serialData.substring(0, serialData.indexOf(":")).toInt();
   serialData.remove(0, serialData.indexOf(":") + 1);
   // Extrai o wait
-  wait = serialData.substring(0, serialData.indexOf(":")).toInt();
+  params.wait = serialData.substring(0, serialData.indexOf(":")).toInt();
 
-  switch(innerWaveForm) {
-      case 0:
-        TrapezoidalWaveVectorGenerator(false, duty);
-        break;
-      case 1:
-        TrapezoidalWaveVectorGenerator(true, duty);
-        break;
-      default:
-        break;
-    }
+  GenerateWaveVector();
 }

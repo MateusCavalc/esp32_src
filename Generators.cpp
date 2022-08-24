@@ -1,38 +1,56 @@
-#include "Arduino.h"
 #include "Generators.h"
+#include "Arduino.h"
 
-void SawToothWaveVectorGenerator(int dutyInicial) {
+void GenerateWaveVector() {
+  int duty = ((float)params.duty_pct / 100) * 255;
   
-  float dutyScaleStep = (float)dutyInicial/BASE_DUTY_INIT_VALUE; // Escala entre os valores de duty e dutyBase (ajuste de slope)
-  int i = 0;
-  
-  for(float dutyLocal = (float)dutyInicial; dutyLocal >= 0; dutyLocal -= dutyScaleStep, i++) {
-    innerWavePoints[i] = ceil(dutyLocal);
+  switch(params.innerWaveForm) {
+    case 0:
+      GenerateTrapezoidalWaveVector(false, duty); // Crescente ( /| )
+      break;
+    case 1:
+      GenerateTrapezoidalWaveVector(true, duty);  // Decaimento ( |\ )
+      break;
+    case 2:
+      GenerateSawToothWaveVector(duty);
+      break;
+    default:
+      break;
   }
 }
 
-void TrapezoidalWaveVectorGenerator(bool inv, int dutyInicial) {
+void GenerateTrapezoidalWaveVector(bool inv, int dutyInicial) {
 
   int finalDutyPct = 20;
   int finalDuty = ((float)finalDutyPct / 100) * dutyInicial;
   
-  float dutyScaleStep = (float)dutyInicial/BASE_DUTY_INIT_VALUE; // Escala entre os valores de duty e dutyBase (ajuste de slope)
+  float dutyScaleStep = (float)dutyInicial/configs.BASE_DUTY_INIT_VALUE; // Escala entre os valores de duty e dutyBase (ajuste de slope)
   int i = 0;
 
   if(inv) {
     for(float dutyLocal = (float)finalDuty; dutyLocal <= dutyInicial; dutyLocal += dutyScaleStep, i++) {
-      innerWavePoints[i] = ceil(dutyLocal);
+      bufferPoints[i] = ceil(dutyLocal);
     }
   }
   else {
     for(float dutyLocal = (float)dutyInicial; dutyLocal >= finalDuty; dutyLocal -= dutyScaleStep, i++) {
-      innerWavePoints[i] = ceil(dutyLocal);
+      bufferPoints[i] = ceil(dutyLocal);
     }
   }
   
 }
 
-void PulseTrainGenerator(int innerWave, int outterWave, int localDuty, int frequency, int upTime, int wait, int channel) {
+void GenerateSawToothWaveVector(int dutyInicial) {
+  
+  float dutyScaleStep = (float)dutyInicial/configs.BASE_DUTY_INIT_VALUE; // Escala entre os valores de duty e dutyBase (ajuste de slope)
+  int i = 0;
+  
+  for(float dutyLocal = (float)dutyInicial; dutyLocal >= 0; dutyLocal -= dutyScaleStep, i++) {
+    bufferPoints[i] = ceil(dutyLocal);
+  }
+}
+
+void GeneratePulseTrain(int innerWave, int outterWave, int localDuty, int frequency, int upTime, int wait, int channel) {
   int InnerPeriod = ((1.0/frequency)*(1000000));
 //  SquareWave(channel, localDuty, upTime, InnerPeriod);
   
