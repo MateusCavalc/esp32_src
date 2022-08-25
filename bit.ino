@@ -49,13 +49,13 @@ void loop() {
 
   int duty = ((float)params.duty_pct / 100) * 255;
 
-//    PulseTrainGenerator(params.innerWaveForm, params.outterWaveForm, duty, params.innerFrequency, params.uptime, params.wait, channels.PADS_CHANNEL_1);
+    GeneratePulseTrain(params.innerWaveForm, params.outterWaveForm, duty, params.innerFrequency, params.uptime, params.wait, channels.PADS_CHANNEL_1);
 
-  for (int i = 0; i < (sizeof(freqList) / sizeof(freqList[0])); i++) {
-    GeneratePulseTrain(params.innerWaveForm, params.outterWaveForm, duty, (int)((float)freqList[i]/2), noteTimes[i] * BASE_COMPASS, params.wait, channels.PADS_CHANNEL_1);
-  }
+//  for (int i = 0; i < (sizeof(freqList) / sizeof(freqList[0])); i++) {
+//    GeneratePulseTrain(params.innerWaveForm, params.outterWaveForm, duty, (int)((float)freqList[i]/2), noteTimes[i] * BASE_COMPASS, params.wait, channels.PADS_CHANNEL_1);
+//  }
 
-  delay(1000);
+//  delay(1000);
   
 //   if(waveForm == 0) { // Onda Quadrada
 //     SquareWave(ledChannel1);
@@ -75,7 +75,7 @@ void loop() {
 }
 
 void ParseSerialParams(String serialData) {
-  // 0:0:30:10:1000000:1000000
+  // 0:0:70:50:1000000:1000000
   // Extrai o innerWaveForm
   params.innerWaveForm = serialData.substring(0, serialData.indexOf(":")).toInt();
   serialData.remove(0, serialData.indexOf(":") + 1);
