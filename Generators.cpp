@@ -60,10 +60,10 @@ void GenerateOutterSquareWave(int innerWave, int outterWave, int localDuty, int 
         Square_SquareWave(channel, upTime, InnerPeriod, localDuty);
         break;
       case 2:
-        SawToothWave(channel, upTime, InnerPeriod);
+        TrapezoidalWave(channel, upTime, frequency, InnerPeriod);
         break;
       case 3:
-//        SquareWave(channel, localDuty, upTime, InnerPeriod);
+//        SawToothWave(channel, upTime, InnerPeriod);
         break;
       case 4:
 //        SineWave(channel, upTime, InnerPeriod, outterWave);
@@ -71,8 +71,6 @@ void GenerateOutterSquareWave(int innerWave, int outterWave, int localDuty, int 
       default:
         break;
     }
-
-    RestWave(channel, wait, InnerPeriod);
 }
 
 void GenerateOutterSawToothWave(int innerWave, int outterWave, int localDuty, int frequency, int upTime, int wait, int channel) {
@@ -80,13 +78,11 @@ void GenerateOutterSawToothWave(int innerWave, int outterWave, int localDuty, in
   
     switch(innerWave) {
       case 0:
-        Square_SquareWave(channel, upTime, InnerPeriod, localDuty);
-        break;
       case 1:
-        TrapezoidalWave(channel, upTime, frequency, InnerPeriod);
+        SawTooth_SquareWave(channel, upTime, InnerPeriod);
         break;
       case 2:
-//        Square_SquareWave(channel, upTime, InnerPeriod);
+        TrapezoidalWave(channel, upTime, frequency, InnerPeriod);
         break;
       case 3:
         SawTooth_SquareWave(channel, upTime, InnerPeriod);
@@ -97,8 +93,28 @@ void GenerateOutterSawToothWave(int innerWave, int outterWave, int localDuty, in
       default:
         break;
     }
+}
 
-    RestWave(channel, wait, InnerPeriod);
+void GenerateOutterSineWave(int innerWave, int outterWave, int localDuty, int frequency, int upTime, int wait, int channel) {
+  int InnerPeriod = ((1.0/frequency)*(1000000));
+  
+    switch(innerWave) {
+      case 0:
+      case 1:
+        Sine_SquareWave(channel, upTime, InnerPeriod, localDuty);
+        break;
+      case 2:
+//        TrapezoidalWave(channel, upTime, frequency, InnerPeriod);
+        break;
+      case 3:
+//        SawToothWave(channel, upTime, InnerPeriod);
+        break;
+      case 4:
+//        SineWave(channel, upTime, InnerPeriod, outterWave);
+        break;
+      default:
+        break;
+    }
 }
 
 void GeneratePulseTrain(int innerWave, int outterWave, int localDuty, int frequency, int upTime, int wait, int channel) {
@@ -121,10 +137,12 @@ void GeneratePulseTrain(int innerWave, int outterWave, int localDuty, int freque
 //        GenerateOutterSquareWave(innerWave, outterWave, localDuty, frequency, upTime, wait, channel);
         break;
       case 4:
-//        GenerateOutterSineWave(channel, upTime, InnerPeriod);
+        GenerateOutterSineWave(innerWave, outterWave, localDuty, frequency, upTime, wait, channel);
         break;
       default:
         break;
     }
-//    RestWave(channel, wait, InnerPeriod);
+    
+    RestWave(channel, wait, InnerPeriod);
+    
   }

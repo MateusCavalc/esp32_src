@@ -75,7 +75,7 @@ void loop() {
 }
 
 void ParseSerialParams(String serialData) {
-  // 0:0:70:50:1000000:1000000
+  // 0:4:70:10:1000000:1000000
   // Extrai o innerWaveForm
   params.innerWaveForm = serialData.substring(0, serialData.indexOf(":")).toInt();
   serialData.remove(0, serialData.indexOf(":") + 1);

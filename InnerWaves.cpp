@@ -68,50 +68,6 @@ void TrapezoidalWave(int channel, int upTime, int frequency, int period) {
   
 }
 
-void Square_SquareWave(int channel, int upTime, int frequency, int localDuty){
-  int64_t old = esp_timer_get_time();
-
-  while(esp_timer_get_time() - old <= (int64_t)upTime) {
-    
-    int64_t oldInner = esp_timer_get_time();
-    
-    while(esp_timer_get_time() - oldInner <= (int64_t)frequency/2) {
-      Serial.printf("0, 255, %d, %d\n", localDuty, localDuty);
-      ledcWrite(channel, localDuty);
-    }
-    
-    while(esp_timer_get_time() - oldInner <= (int64_t)frequency) {
-      Serial.printf("0, 255, 0, %d\n", localDuty);
-      // checks if uptime is over
-      ledcWrite(channel, 0);
-    }
-    
-  }
-}
-
-void SawTooth_SquareWave(int channel, int upTime, int frequency){
-  int64_t old = esp_timer_get_time();
-
-  for(int i = 0; (esp_timer_get_time() - old <= (int64_t)upTime) && (bufferPoints[i] > 0); i++) {
-    int localDuty = bufferPoints[i];
-    
-    int64_t oldInner = esp_timer_get_time();
-    
-    while(esp_timer_get_time() - oldInner <= (int64_t)frequency/2) {
-//      Serial.printf("0, 255, %d, %d\n", localDuty, localDuty);
-      ledcWrite(channel, localDuty);
-    }
-    
-    while(esp_timer_get_time() - oldInner <= (int64_t)frequency) {
-//      Serial.printf("0, 255, 0, %d\n", localDuty);
-      // checks if uptime is over
-      ledcWrite(channel, 0);
-    }
-    
-    
-  }
-}
-
 void SquareWave(int channel, int localDuty, int upTime, int frequency, int outterWave) {
 //  Serial.println("squareWave");
 
@@ -128,6 +84,27 @@ void SquareWave(int channel, int localDuty, int upTime, int frequency, int outte
     
     while(esp_timer_get_time() - oldInner <= (int64_t)frequency) {
       Serial.printf("0, 255, 0\n");
+      // checks if uptime is over
+      ledcWrite(channel, 0);
+    }
+    
+  }
+}
+
+void Square_SquareWave(int channel, int upTime, int frequency, int localDuty){
+  int64_t old = esp_timer_get_time();
+
+  while(esp_timer_get_time() - old <= (int64_t)upTime) {
+    
+    int64_t oldInner = esp_timer_get_time();
+    
+    while(esp_timer_get_time() - oldInner <= (int64_t)frequency/2) {
+      Serial.printf("0, 255, %d, %d\n", localDuty, localDuty);
+      ledcWrite(channel, localDuty);
+    }
+    
+    while(esp_timer_get_time() - oldInner <= (int64_t)frequency) {
+      Serial.printf("0, 255, 0, %d\n", localDuty);
       // checks if uptime is over
       ledcWrite(channel, 0);
     }
@@ -156,6 +133,33 @@ void SawToothWave(int channel, int upTime, int period) {
 
   }
   
+}
+
+void SawTooth_SquareWave(int channel, int upTime, int period){
+  
+  int outterStep = round((float)upTime/configs.BASE_DUTY_INIT_VALUE);
+  
+  int64_t old = esp_timer_get_time();
+
+  for(int i = 0; (esp_timer_get_time() - old <= (int64_t)upTime) && (bufferPoints[i] > 0); i++) {
+    int localDuty = bufferPoints[i];
+    
+    int64_t oldOutterStep = esp_timer_get_time();
+
+    while(esp_timer_get_time() - oldOutterStep <= (int64_t)outterStep) {
+      int64_t oldSquare = esp_timer_get_time();
+
+      ledcWrite(channel, localDuty);
+      while(esp_timer_get_time() - oldSquare <= (int64_t)period/2) {
+        Serial.printf("0, 255, %d, %d\n", localDuty, localDuty);
+      }
+  
+      ledcWrite(channel, 0);
+      while(esp_timer_get_time() - oldSquare <= (int64_t)period) {
+        Serial.printf("0, 255, 0, %d\n", localDuty);
+      }
+    }    
+  }
 }
 
 void TriangleWave(int channel, int dutyInicial, int upTime, int frequency) {
@@ -195,4 +199,35 @@ void SineWave(int channel, int upTime, int period) {
     }
   }
 
+}
+
+void Sine_SquareWave(int channel, int upTime, int period, int localDuty){
+
+  int outterStep = round((float)upTime/8);
+
+  int actDuty = 0;
+  
+  int64_t old = esp_timer_get_time();
+
+  for(int i = 0; (esp_timer_get_time() - old <= (int64_t)upTime) && (i < 8); i++) {
+    actDuty = (int)(localDuty * sinePoints[i]);
+
+    int64_t oldOutterStep = esp_timer_get_time();
+
+    while(esp_timer_get_time() - oldOutterStep <= (int64_t)outterStep) {
+      int64_t oldSquare = esp_timer_get_time();
+
+      ledcWrite(channel, actDuty);
+      while(esp_timer_get_time() - oldSquare <= (int64_t)period/2) {
+        Serial.printf("0, 255, %d, %d\n", actDuty, actDuty);
+      }
+  
+      ledcWrite(channel, 0);
+      while(esp_timer_get_time() - oldSquare <= (int64_t)period) {
+        Serial.printf("0, 255, 0, %d\n", actDuty);
+        // checks if uptime is over
+      }
+    }
+
+  }
 }
